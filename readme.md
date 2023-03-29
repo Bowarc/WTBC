@@ -6,6 +6,6 @@ Daemon runs in the back 24/7(when the machine is running) and client can connect
 - [x] Client - Daemon comunicaton (used std::net::TcpStream and the Daemon has a std::net::TcpListener)
 - [x] Daemon can get and set the WT background
 - [x] Daemon logs and backup file for failsafe when setting new bg
-- [ ] Robust error handling (Still need to make a backup file at boot and use it when Set goes wrong)
+- [x] Robust error handling.
 - [ ] Daemon logs it's actions
 - [ ] Cool client
