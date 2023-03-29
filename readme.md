@@ -7,5 +7,5 @@ Daemon runs in the back 24/7(when the machine is running) and client can connect
 - [x] Daemon can get and set the WT background
 - [x] Daemon logs and backup file for failsafe when setting new bg
 - [x] Robust error handling.
-- [ ] Daemon logs it's actions
+- [x] Daemon logs it's actions
 - [ ] Cool client
