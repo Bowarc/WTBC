@@ -1,3 +1,6 @@
+pub const LOG_FILE_LOCATION: &str = "logs.log";
+pub const BACKUP_FILE_NAME: &str = "settings.json.wtbc.backup";
+
 pub enum SleepTime {
     Fix(std::time::Duration),
     Range(std::time::Duration, std::time::Duration),
@@ -49,17 +52,13 @@ impl SleepTime {
 }
 
 impl BgFieldLoc {
-    pub fn get(&self, value: serde_json::Value) -> Option<serde_json::Value> {
-        value.pointer(self.0).cloned()
+    pub fn get(
+        &self,
+        value: serde_json::Value,
+    ) -> Result<serde_json::Value, crate::error::BackgroundChangerError> {
+        value
+            .pointer(self.0)
+            .cloned()
+            .ok_or(crate::error::BackgroundChangerError::Config)
     }
-
-    // pub fn set(&self, value: &mut serde_json::Value, replacement: String) -> Option<()> {
-    //     println!("Setting {replacement} to {}", self.0);
-
-    //     // println!("\n\n{value:?}\n\n");
-    //     let entry = value.pointer_mut(self.0)?;
-    //     println!("{}", entry);
-    //     *entry = replacement.into();
-    //     Some(())
-    // }
 }
