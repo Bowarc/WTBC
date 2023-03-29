@@ -36,6 +36,8 @@ pub enum SocketError {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientMessage {
     Text(String),
+    GetLogFile, // asks for the position of the log file
+    GetHistory, // asks for the bgchanger history, that said, might be better to have an app history, i mean, ~~it would be cool for the client to see what client connected~~meh
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonMessage {}
