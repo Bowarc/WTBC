@@ -155,7 +155,7 @@ impl BgChanger {
     }
 
     pub fn set(&self) -> Result<(), Box<dyn std::error::Error>> {
-        use std::io::{Read as _, Write as _};
+        use std::io::Read as _;
 
         let old_bg = self
             .get()
@@ -231,8 +231,6 @@ fn main() {
             clients.push(std::thread::spawn(move || handle_client(stream)))
         }
     }
-
-    // std::thread::sleep(std::time::Duration::from_secs(20));
 }
 
 fn handle_client(stream: std::net::TcpStream) {
@@ -279,7 +277,7 @@ fn test_bg_changer() {
         println!("{msg}");
     }
 
-    println!("");
+    println!();
     println!("actual bg: {:?}", bg_changer.get());
 
     // dbg!(&bg_changer.set());
