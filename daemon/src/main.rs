@@ -129,62 +129,6 @@ impl BgChanger {
         }
         Some(path)
     }
-
-    pub fn set(&self) -> Result<(), Box<dyn std::error::Error>> {
-        use std::io::{Read as _, Write as _};
-
-        // Ugly af, don't like this part
-        let new_bg = loop {
-            if let Some(bg) = self.select_random_bg() {
-                break bg;
-            }
-        };
-
-        let mut original_content = String::new();
-
-        drop(
-            std::fs::OpenOptions::new()
-                .read(true)
-                .write(false)
-                .open(self.cfg.wt_config_path.clone())?
-                .read_to_string(&mut original_content),
-        );
-
-        let old_json: serde_json::Value = serde_json::from_str(&original_content)?;
-
-        let mut json_content = old_json.clone();
-
-        self.cfg
-            .background_field_location
-            .set(
-                &mut json_content,
-                new_bg
-                    .as_path()
-                    .display()
-                    .to_string()
-                    .replace("\\\\?\\", ""),
-            )
-            .ok_or("Can't set bg")?;
-
-        assert!(old_json != json_content);
-
-        let new_content = json_content.to_string();
-
-        let pretty_content = format!("{json_content:#?}");
-
-        // println!("New content:\n{json_content:#?}");
-
-        println!("Writing to {:?}", self.cfg.wt_config_path);
-
-        std::fs::OpenOptions::new()
-            .read(false)
-            .write(true)
-            .open(self.cfg.wt_config_path.clone())?
-            .write_all(pretty_content.as_bytes())?;
-
-        Ok(())
-    }
-
     pub fn get(&self) -> Option<String> {
         use std::io::Read as _;
         let mut content = String::new();
@@ -208,57 +152,54 @@ impl BgChanger {
             .get(settings_file)?
             .as_str()
             .map(|bg| bg.to_string());
+    }
 
-        // return settings_file["profiles"]["defaults"]["backgroundImage"]
-        //     .as_str()
-        //     .map(|bg| bg.to_string());
+    pub fn set(&self) -> Result<(), Box<dyn std::error::Error>> {
+        use std::io::{Read as _, Write as _};
 
-        // but keeping the files comments would be cool
-        // deserializing the data removes the coments (as you don't deserialize comments)
-        // https://github.com/hjson/hjson-rust can be the solution ?
-        // Well, pure JSON doesn't allow comments. you can add some, but you're not supposed to.
-        // my project will then follow this route, if you need to store more info, use a `readme.md`
-        // in the config's directory
+        let old_bg = self
+            .get()
+            .ok_or("Error while getting background from config file")?;
 
-        // working but not as efficient
-        // for line in content.lines() {
-        //     // Try to split the line in the ':' since WT settigns i just a big Key-Value map
-        //     let splitted_line = line.split(':').collect::<Vec<&str>>();
+        // Ugly af, don't like this part
+        let new_bg = loop {
+            if let Some(bg) = self.select_random_bg() {
+                break bg;
+            }
+        }
+        .as_path()
+        .display()
+        .to_string()
+        .replace("\\\\?\\", "")
+        .replace('\\', "/");
 
-        //     if splitted_line.len() < 2 {
-        //         println!("Skipping: '{line}'");
-        //         continue;
-        //     }
-        //     if splitted_line.len() > 2 {
-        //         println!(
-        //             "Tf is going on: '{line}' --- {splitted_line:?} -- {}",
-        //             splitted_line.len()
-        //         );
-        //         continue;
-        //     }
+        let mut original_content = String::new();
 
-        //     let key = splitted_line[0]
-        //         .replace(['\n', '\"', ' ', ':'], "")
-        //         .replace(KEYWORD, "");
+        drop(
+            std::fs::OpenOptions::new()
+                .read(true)
+                .write(false)
+                .open(self.cfg.wt_config_path.clone())?
+                .read_to_string(&mut original_content),
+        );
 
-        //     if key == KEYWORD {
-        //         output = splitted_line[1].replace([',', ' ', '"'], "");
-        //     }
+        println!("Replacing '{old_bg}' by '{new_bg}'");
 
-        //     // if line.replace([' ', '"'], "").starts_with(KEYWORD) {
-        //     //     let bg = line
-        //     //         .replace(['\n', '\"', ' ', ':'], "")
-        //     //         .replace(KEYWORD, "");
-        //     //     println!("{bg}");
-        //     //     output = bg;
-        //     //     break;
-        //     // }
-        // }
+        let new_content = original_content.replace(&old_bg, &new_bg);
 
-        // match output == String::new() {
-        //     true => None,
-        //     false => Some(output),
-        // }
+        std::fs::write(self.cfg.wt_config_path.clone(), new_content)?;
+
+        // verify that the file has be written successfully
+
+        if self
+            .get()
+            .and_then(|bg| if bg == new_bg { Some(bg) } else { None })
+            .is_none()
+        {
+            return Err("Check failled".into());
+        }
+
+        Ok(())
     }
 
     fn update(&mut self) {}
@@ -279,7 +220,7 @@ fn main() {
 
     dbg!(bg_changer.get());
 
-    dbg!(bg_changer.set().unwrap());
+    dbg!(bg_changer.set());
 
     if false {
         let listener = std::net::TcpListener::bind(shared::networking::DEFAULT_ADDRESS).unwrap();

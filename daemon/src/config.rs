@@ -28,7 +28,7 @@ impl BgChangerConfig {
 
     pub fn is_ok(&self) -> bool {
         // more later ?
-        return self.wt_config_path.exists();
+        self.wt_config_path.exists()
     }
 }
 impl SleepTime {
@@ -53,13 +53,13 @@ impl BgFieldLoc {
         value.pointer(self.0).cloned()
     }
 
-    pub fn set(&self, value: &mut serde_json::Value, replacement: String) -> Option<()> {
-        println!("Setting {replacement} to {}", self.0);
+    // pub fn set(&self, value: &mut serde_json::Value, replacement: String) -> Option<()> {
+    //     println!("Setting {replacement} to {}", self.0);
 
-        // println!("\n\n{value:?}\n\n");
-        let entry = value.pointer_mut(self.0)?;
-        println!("{}", entry);
-        *entry = replacement.into();
-        Some(())
-    }
+    //     // println!("\n\n{value:?}\n\n");
+    //     let entry = value.pointer_mut(self.0)?;
+    //     println!("{}", entry);
+    //     *entry = replacement.into();
+    //     Some(())
+    // }
 }
