@@ -11,12 +11,16 @@ struct BgPath {
 
 struct BgChanger {
     paths: Vec<BgPath>,
-    wt_config_path: std::path::PathBuf,
-    config: config::BgChangerConfig,
+    cfg: config::BgChangerConfig,
 }
 
 impl BgChanger {
-    pub fn new(wt_config_path: std::path::PathBuf, bg_paths: Vec<std::path::PathBuf>) -> Self {
+    pub fn new(
+        bg_paths: Vec<std::path::PathBuf>,
+        wt_config_path: std::path::PathBuf,
+        sleep_time: config::SleepTime,
+        background_field_loc: &'static str,
+    ) -> Self {
         // make sure that paths are corrects
         let bg_files_supported_extensions = ["png"];
 
@@ -102,11 +106,14 @@ impl BgChanger {
 
         assert!(wt_config_path.exists());
 
-        Self {
-            paths,
+        let cfg = config::BgChangerConfig::new(
+            sleep_time,
+            config::BgFieldLoc(background_field_loc),
             wt_config_path,
-            config: config::BgChangerConfig::default(),
-        }
+        );
+        assert!(cfg.is_ok());
+
+        Self { paths, cfg }
     }
     pub fn select_random_bg(&self) -> Option<std::path::PathBuf> {
         use rand::prelude::SliceRandom as _;
@@ -123,7 +130,60 @@ impl BgChanger {
         Some(path)
     }
 
-    pub fn set(&mut self) {}
+    pub fn set(&self) -> Result<(), Box<dyn std::error::Error>> {
+        use std::io::{Read as _, Write as _};
+
+        // Ugly af, don't like this part
+        let new_bg = loop {
+            if let Some(bg) = self.select_random_bg() {
+                break bg;
+            }
+        };
+
+        let mut original_content = String::new();
+
+        drop(
+            std::fs::OpenOptions::new()
+                .read(true)
+                .write(false)
+                .open(self.cfg.wt_config_path.clone())?
+                .read_to_string(&mut original_content),
+        );
+
+        let old_json: serde_json::Value = serde_json::from_str(&original_content)?;
+
+        let mut json_content = old_json.clone();
+
+        self.cfg
+            .background_field_location
+            .set(
+                &mut json_content,
+                new_bg
+                    .as_path()
+                    .display()
+                    .to_string()
+                    .replace("\\\\?\\", ""),
+            )
+            .ok_or("Can't set bg")?;
+
+        assert!(old_json != json_content);
+
+        let new_content = json_content.to_string();
+
+        let pretty_content = format!("{json_content:#?}");
+
+        // println!("New content:\n{json_content:#?}");
+
+        println!("Writing to {:?}", self.cfg.wt_config_path);
+
+        std::fs::OpenOptions::new()
+            .read(false)
+            .write(true)
+            .open(self.cfg.wt_config_path.clone())?
+            .write_all(pretty_content.as_bytes())?;
+
+        Ok(())
+    }
 
     pub fn get(&self) -> Option<String> {
         use std::io::Read as _;
@@ -131,7 +191,10 @@ impl BgChanger {
 
         // We don't need to hold the file
         drop(
-            std::fs::File::open(self.wt_config_path.clone())
+            std::fs::OpenOptions::new()
+                .read(true)
+                .write(false)
+                .open(self.cfg.wt_config_path.clone())
                 .ok()?
                 .read_to_string(&mut content),
         );
@@ -139,9 +202,23 @@ impl BgChanger {
         let settings_file: serde_json::Value = serde_json::from_str(&content).ok()?;
 
         // maybe check multiple locations (["profiles"], iter, find the backgroundImage key)
-        return settings_file["profiles"]["defaults"]["backgroundImage"]
+        return self
+            .cfg
+            .background_field_location
+            .get(settings_file)?
             .as_str()
             .map(|bg| bg.to_string());
+
+        // return settings_file["profiles"]["defaults"]["backgroundImage"]
+        //     .as_str()
+        //     .map(|bg| bg.to_string());
+
+        // but keeping the files comments would be cool
+        // deserializing the data removes the coments (as you don't deserialize comments)
+        // https://github.com/hjson/hjson-rust can be the solution ?
+        // Well, pure JSON doesn't allow comments. you can add some, but you're not supposed to.
+        // my project will then follow this route, if you need to store more info, use a `readme.md`
+        // in the config's directory
 
         // working but not as efficient
         // for line in content.lines() {
@@ -191,11 +268,18 @@ fn main() {
     // will later be made into a real daemon, (Windows service) but i don't care for now
 
     let bg_changer = BgChanger::new(
-        std::path::PathBuf::from("C:\\Users\\Heto\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json"),
         vec![
-
+            // std::path::PathBuf::from("D:\\Links\\Pictures\\"),
+            std::path::PathBuf::from("D:\\Links\\Pictures\\lol_skins\\"),
         ],
+        std::path::PathBuf::from("C:\\Users\\Heto\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json"),
+        config::SleepTime::Fix(std::time::Duration::from_secs(45)),
+        "/profiles/defaults/backgroundImage",
     );
+
+    dbg!(bg_changer.get());
+
+    dbg!(bg_changer.set().unwrap());
 
     if false {
         let listener = std::net::TcpListener::bind(shared::networking::DEFAULT_ADDRESS).unwrap();
@@ -206,6 +290,8 @@ fn main() {
             clients.push(std::thread::spawn(move || handle_client(stream)))
         }
     }
+
+    // std::thread::sleep(std::time::Duration::from_secs(20));
 }
 
 fn handle_client(stream: std::net::TcpStream) {
@@ -220,11 +306,13 @@ fn handle_client(stream: std::net::TcpStream) {
 #[test]
 fn test_bg_changer() {
     let bg_changer = BgChanger::new(
-        std::path::PathBuf::from("C:\\Users\\Heto\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json"),
         vec![
             std::path::PathBuf::from("D:\\Links\\Pictures\\"),
             std::path::PathBuf::from("D:\\Links\\Pictures\\lol_skins\\"),
         ],
+        std::path::PathBuf::from("C:\\Users\\Heto\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json"),
+        config::SleepTime::Fix(std::time::Duration::from_secs(45)),
+        "/profiles/defaults/backgroundImage",
     );
 
     assert!(!bg_changer.paths.is_empty());
@@ -251,5 +339,7 @@ fn test_bg_changer() {
     }
 
     println!("");
-    println!("{:?}", bg_changer.get());
+    println!("actual bg: {:?}", bg_changer.get());
+
+    // dbg!(&bg_changer.set());
 }
