@@ -16,7 +16,6 @@ pub struct PacketHeader {
 // I don't like how streams work so i'll make a simple socket-like, packet-based struct wrapper
 pub struct Socket<R, W> {
     stream: std::net::TcpStream,
-    buffer: Vec<u8>,
     read_type: std::marker::PhantomData<R>,
     write_type: std::marker::PhantomData<W>,
 }
@@ -27,9 +26,9 @@ pub enum SocketError {
     NotEnoughData,
     #[error("meh")]
     Unknown,
-    #[error("uh oh")]
-    SerializeError(#[from] bincode::Error),
-    #[error("ee")]
+    #[error("Serializaton error: {0} ")]
+    DeSerializationError(#[from] bincode::Error),
+    #[error("std::io error: {0}")]
     IoError(#[from] std::io::Error),
 }
 
@@ -38,15 +37,19 @@ pub enum ClientMessage {
     Text(String),
     GetLogFile, // asks for the position of the log file
     GetHistory, // asks for the bgchanger history, that said, might be better to have an app history, i mean, ~~it would be cool for the client to see what client connected~~meh
+    SetBg,
 }
 #[derive(Serialize, Deserialize, Debug)]
-pub enum DaemonMessage {}
+pub enum DaemonMessage {
+    Text(String),
+    History(crate::server::history::History),
+    LogFile(String), // Path
+}
 
 impl<R: DeserializeOwned + std::fmt::Debug, W: Serialize + std::fmt::Debug> Socket<R, W> {
     pub fn new(stream: std::net::TcpStream) -> Self {
         Self {
             stream,
-            buffer: Vec::new(),
             read_type: std::marker::PhantomData,
             write_type: std::marker::PhantomData,
         }
@@ -54,28 +57,32 @@ impl<R: DeserializeOwned + std::fmt::Debug, W: Serialize + std::fmt::Debug> Sock
     pub fn send(&mut self, message: W) -> Result<(), SocketError> {
         use std::io::Write as _;
 
-        println!("Serializing message..");
+        // println!("Serializing message..");
         let message_bytes = bincode::serialize(&message)?;
-        println!("Serializing message.. Done, {} bytes", message_bytes.len());
+        // println!("Serializing message.. Done, {} bytes", message_bytes.len());
 
-        println!("Creating header..");
+        // println!("Creating header..");
         let header = PacketHeader::new(message_bytes.len());
-        println!("Creating header.. Done, {header:?}");
+        // println!("Creating header.. Done, {header:?}");
 
-        println!("Serializing header..");
+        // println!("Serializing header..");
         let header_bytes = bincode::serialize(&header)?;
-        println!("Serializing header.. Done, {} bytes", header_bytes.len());
+        // println!("Serializing header.. Done, {} bytes", header_bytes.len());
 
-        assert_eq!(header_bytes.len(), HEADER_SIZE);
+        // idk if panicking is a good idea
+        // assert_eq!(header_bytes.len(), HEADER_SIZE);
+        if !header_bytes.len() == HEADER_SIZE {
+            return Err(SocketError::DeSerializationError(Box::new(bincode::ErrorKind::Custom("The length of the serialized header is not equal to the HEADER_SIZE constant ({HEADER_SIZE})".into())),));
+        }
 
-        println!("Writing header to stream..");
+        // println!("Writing header to stream..");
         self.stream.write_all(&header_bytes)?;
-        println!("Writing header to stream.. Ok");
-        println!("Writing message to stream..");
+        // println!("Writing header to stream.. Ok");
+        // println!("Writing message to stream..");
         self.stream.write_all(&message_bytes)?;
-        println!("Writing message to stream.. Ok");
+        // println!("Writing message to stream.. Ok");
 
-        println!("Exiting send function");
+        // println!("Exiting send function");
         Ok(())
     }
     pub fn recv(&mut self) -> Result<R, SocketError> {
@@ -83,29 +90,37 @@ impl<R: DeserializeOwned + std::fmt::Debug, W: Serialize + std::fmt::Debug> Sock
 
         let mut header_buffer: [u8; HEADER_SIZE] = [0; HEADER_SIZE];
 
-        println!("Reading header..");
+        // println!("Reading header..");
         self.stream.read_exact(&mut header_buffer)?;
-        println!("Reading header.. Done, {} bytes", header_buffer.len());
+        // println!("Reading header.. Done, {} bytes", header_buffer.len());
 
-        println!("Deserializing header..");
+        // println!("Deserializing header..");
         let header: PacketHeader = bincode::deserialize(&header_buffer)?;
-        println!("Deserializing header.. Done: {header:?}");
+        // println!("Deserializing header.. Done: {header:?}");
 
         let mut message_buffer = vec![0; header.size];
 
-        println!("Reading message ({} bytes)..", header.size);
+        // println!("Reading message ({} bytes)..", header.size);
         self.stream.read_exact(&mut message_buffer)?;
-        println!(
-            "Reading message ({} bytes).. Done, {} bytes",
-            header.size,
-            message_buffer.len()
-        );
+        // println!(
+        //     "Reading message ({} bytes).. Done, {} bytes",
+        //     header.size,
+        //     message_buffer.len()
+        // );
 
-        println!("Deserializing message..");
+        // println!("Deserializing message..");
         let message = bincode::deserialize(&message_buffer)?;
-        println!("Deserializing message.. Done, {message:?}");
+        // println!("Deserializing message.. Done, {message:?}");
 
         Ok(message)
+    }
+
+    pub fn local_addr(&self) -> std::net::SocketAddr {
+        self.stream.local_addr().unwrap()
+    }
+
+    pub fn remote_addr(&self) -> std::net::SocketAddr {
+        self.stream.peer_addr().unwrap()
     }
 }
 

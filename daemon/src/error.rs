@@ -14,4 +14,6 @@ pub enum BackgroundChangerError {
     Verification,
     #[error("Something went wrong during initialisation: {0}")]
     Initialisation(&'static str),
+    #[error("An error occured while using the shared::networking::Socket: {0}")]
+    SocketError(#[from] shared::networking::SocketError),
 }

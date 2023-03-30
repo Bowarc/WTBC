@@ -165,6 +165,7 @@ dependencies = [
  "log",
  "log-panics",
  "rand",
+ "serde",
  "serde_json",
  "shared",
  "thiserror",

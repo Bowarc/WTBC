@@ -8,11 +8,33 @@ fn main() {
         shared::networking::ClientMessage,
     >::new(stream);
 
-    let message = shared::networking::ClientMessage::Text(String::from("Hellow\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+    loop {
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
 
-    println!("Connected, sending: {:?}", message);
+        let message = match input.replace(['\n', '\r'], "").as_str() {
+            "getlog" => shared::networking::ClientMessage::GetLogFile,
+            "gethistory" => shared::networking::ClientMessage::GetHistory,
+            "setbg" => shared::networking::ClientMessage::SetBg,
+            "exit" => std::process::exit(0),
+            text => shared::networking::ClientMessage::Text(text.to_string()),
+        };
 
-    socket.send(message).unwrap();
+        // let message = shared::networking::ClientMessage::Text(input.replace(['\n', '\r'], "")); //
 
-    println!("Success");
+        println!("Sending: {:?}", message);
+        socket.send(message).unwrap();
+
+        println!("Waiting for the server to respond");
+
+        let response = loop {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+
+            if let Ok(response) = socket.recv() {
+                break response;
+            }
+        };
+
+        println!("Server sent: {response:?}")
+    }
 }

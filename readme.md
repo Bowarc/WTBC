@@ -8,4 +8,6 @@ Daemon runs in the back 24/7(when the machine is running) and client can connect
 - [x] Daemon logs and backup file for failsafe when setting new bg
 - [x] Robust error handling.
 - [x] Daemon logs it's actions
-- [ ] Cool client
+- [x] Simple client
+- [x] Daemon responds to simple commands
+- [ ] Daemon fully independent

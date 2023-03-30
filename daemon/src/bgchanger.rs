@@ -8,11 +8,16 @@ pub struct BgPath {
 pub struct BgChanger {
     pub paths: Vec<BgPath>,
     pub cfg: crate::config::BgChangerConfig,
-    pub history: crate::history::History,
+    pub history: shared::server::history::History,
 }
 
 impl BgChanger {
-    pub fn new(bg_paths: Vec<std::path::PathBuf>, cfg: crate::config::BgChangerConfig) -> Self {
+    // init functions
+
+    pub fn new(
+        bg_paths: Vec<std::path::PathBuf>,
+        cfg: crate::config::BgChangerConfig,
+    ) -> Result<Self, crate::error::BackgroundChangerError> {
         // make sure that paths are corrects
         let bg_files_supported_extensions = ["png"];
 
@@ -42,13 +47,16 @@ impl BgChanger {
 
         paths.retain(|p| !p.files.is_empty());
 
-        Self {
+        let mut bg_changer = Self {
             paths,
             cfg,
-            history: crate::history::History::new(),
-        }
+            history: shared::server::history::History::new(),
+        };
+
+        bg_changer.init()?;
+        Ok(bg_changer)
     }
-    pub fn init(&mut self) -> Result<(), crate::error::BackgroundChangerError> {
+    fn init(&mut self) -> Result<(), crate::error::BackgroundChangerError> {
         if self.create_backup().is_err() {
             // Can't impl Clone on `crate::error::BackgroundChangerError` koz some Error type doesn't impl it HAHAHAH
             self.history
@@ -97,50 +105,15 @@ impl BgChanger {
             .map(|_| ())
             .map_err(|e| e.into())
     }
-    // fn copy_old_backup(&self) -> Result<(), crate::error::BackgroundChangerError> {
-    //     // This is supposed to be used when you're in deep shit and you can't find your backup file
-    //     // This can happen even if you called BgChanger::create_backup at the start of the program
-    //     // For example.. if you change date while program is active
-    //     // A solution to this problem could be to create (or refresh) the backup file everytime you change config
-    //     // But that is adding a lot of file R/W and i don't like it
+}
 
-    //     // let's try to find the most recent backup
+impl BgChanger {
+    // Other functions
+    pub fn update(&mut self) {}
+}
 
-    //     let date = chrono::Local::now();
-    //     let year = date.year();
-    //     let month = date.month();
-    //     let day = date.day();
-
-    //     let targeted_textension = std::path::PathBuf::from(crate::config::BACKUP_FILE_NAME)
-    //         .extension()
-    //         .unwrap()
-    //         .to_str()
-    //         .unwrap()
-    //         .to_string();
-
-    //     let mut backup_dir = self.cfg.wt_config_path.clone();
-    //     // Remove config path file from path
-    //     backup_dir.pop();
-
-    //     // We obviously not gonna do 150 file system requests so let's get all the files in that dir and check them
-    //     let files_in_directory: Vec<String> = backup_dir
-    //         .read_dir()
-    //         .into_iter()
-    //         .flat_map(|read_dir| {
-    //             read_dir.flatten().filter_map(|entry| {
-    //                 if entry.path().extension()?.to_str()? == targeted_textension {
-    //                     Some(entry.file_name().to_str()?.to_string())
-    //                 } else {
-    //                     None
-    //                 }
-    //             })
-    //         })
-    //         .collect();
-
-    //     debug!("Potential backups in the directory {files_in_directory:#?}");
-
-    //     Ok(())
-    // }
+impl BgChanger {
+    /// Core functions
 
     pub fn select_random_bg(&self) -> Option<std::path::PathBuf> {
         use rand::prelude::SliceRandom as _;
@@ -252,6 +225,4 @@ impl BgChanger {
             }
         })
     }
-
-    pub fn update(&mut self) {}
 }

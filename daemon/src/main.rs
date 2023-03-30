@@ -6,7 +6,6 @@ extern crate log;
 mod bgchanger;
 mod config;
 mod error;
-mod history;
 mod logger;
 mod server;
 
@@ -27,8 +26,7 @@ fn main() {
             config::BgFieldLoc("/profiles/defaults/backgroundImage"),
             std::path::PathBuf::from("C:\\Users\\Heto\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json"),
         ),
-    );
-    bg_changer.init().unwrap();
+    ).unwrap();
 
     // dbg!(bg_changer.get());
 
@@ -38,17 +36,11 @@ fn main() {
 
     let mut server = server::Server::new();
     loop {
-        println!("Loop");
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        std::thread::sleep(std::time::Duration::from_millis(50));
 
         bg_changer.update();
-        bg_changer.set(5).unwrap();
-        server.update();
-        let commands = server.harvest_commands();
-
-        if !commands.is_empty() {
-            // Do something with them, like match on thoses and act on them
-        }
+        // bg_changer.set(5).unwrap();
+        server.update(&mut bg_changer);
     }
 }
 
@@ -64,7 +56,7 @@ fn test_bg_changer() {
             config::BgFieldLoc("/profiles/defaults/backgroundImage"),
             std::path::PathBuf::from("C:\\Users\\Heto\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json"),
         ),
-    );
+    ).unwrap();
 
     dbg!(&bg_changer.paths);
 
