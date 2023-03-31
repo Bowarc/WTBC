@@ -10,4 +10,11 @@ Daemon runs in the back 24/7(when the machine is running) and client can connect
 - [x] Daemon logs it's actions
 - [x] Simple client
 - [x] Daemon responds to simple commands
-- [ ] Daemon fully independent
+- [x] Daemon fully independent
+
+
+This could still be improved, & a real client could be made.
+This version is not perfect (history & logging in general could have been better) but it's ok for now.
+
+Feel free to use / modify it as you want.
+Im open to suggestions for features to add.

@@ -5,7 +5,7 @@ pub enum HistoryBit {
 }
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct History {
-    pub bits: Vec<HistoryBit>,
+    pub bits: Vec<(std::time::SystemTime, HistoryBit)>,
 }
 
 impl Default for History {
@@ -20,10 +20,16 @@ impl History {
     }
 
     pub fn add_background_set(&mut self, old: String, new: String) {
-        self.bits.push(HistoryBit::BackgroundSet(old, new))
+        self.bits.push((
+            std::time::SystemTime::now(),
+            HistoryBit::BackgroundSet(old, new),
+        ))
     }
 
     pub fn add_error_occured(&mut self, error: impl ToString) {
-        self.bits.push(HistoryBit::ErrorOccured(error.to_string()))
+        self.bits.push((
+            std::time::SystemTime::now(),
+            HistoryBit::ErrorOccured(error.to_string()),
+        ))
     }
 }

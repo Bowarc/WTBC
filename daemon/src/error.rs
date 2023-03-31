@@ -16,4 +16,6 @@ pub enum BackgroundChangerError {
     Initialisation(&'static str),
     #[error("An error occured while using the shared::networking::Socket: {0}")]
     SocketError(#[from] shared::networking::SocketError),
+    #[error("Error while interacting with file system: {0}")]
+    Fs(&'static str),
 }

@@ -1,4 +1,7 @@
-// #![windows_subsystem = "windows"]
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions),),
+    windows_subsystem = "windows"
+)]
 
 #[macro_use]
 extern crate log;
@@ -28,25 +31,20 @@ fn main() {
         ),
     ).unwrap();
 
-    // dbg!(bg_changer.get());
-
-    // dbg!(bg_changer.set(5));
-
-    // Set up the server
-
     let mut server = server::Server::new();
     loop {
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        bg_changer.update();
-        // bg_changer.set(5).unwrap();
+        if let Err(e) = bg_changer.update() {
+            bg_changer.history.add_error_occured(e)
+        }
         server.update(&mut bg_changer);
     }
 }
 
 #[test]
 fn test_bg_changer() {
-    let bg_changer = bgchanger::BgChanger::new(
+    let mut bg_changer = bgchanger::BgChanger::new(
         vec![
             std::path::PathBuf::from("D:\\Links\\Pictures\\"),
             std::path::PathBuf::from("D:\\Links\\Pictures\\lol_skins\\"),

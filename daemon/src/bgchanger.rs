@@ -9,6 +9,13 @@ pub struct BgChanger {
     pub paths: Vec<BgPath>,
     pub cfg: crate::config::BgChangerConfig,
     pub history: shared::server::history::History,
+    pub delay: SystemTimeDelay,
+}
+
+#[derive(Copy, Debug, Clone)]
+pub struct SystemTimeDelay {
+    pub instant: std::time::Instant,
+    pub timeout: u128,
 }
 
 impl BgChanger {
@@ -47,10 +54,13 @@ impl BgChanger {
 
         paths.retain(|p| !p.files.is_empty());
 
+        let delay = SystemTimeDelay::new(cfg.sleep_time.get().as_millis());
+
         let mut bg_changer = Self {
             paths,
             cfg,
             history: shared::server::history::History::new(),
+            delay,
         };
 
         bg_changer.init()?;
@@ -109,7 +119,14 @@ impl BgChanger {
 
 impl BgChanger {
     // Other functions
-    pub fn update(&mut self) {}
+    pub fn update(&mut self) -> Result<(), crate::error::BackgroundChangerError> {
+        if self.delay.ended() {
+            self.delay = SystemTimeDelay::new(self.cfg.sleep_time.get().as_millis());
+            self.set(5)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl BgChanger {
@@ -129,7 +146,7 @@ impl BgChanger {
         }
         Some(path)
     }
-    pub fn get(&self) -> Result<String, crate::error::BackgroundChangerError> {
+    pub fn get(&mut self) -> Result<String, crate::error::BackgroundChangerError> {
         use std::io::Read as _;
         let mut content = String::new();
 
@@ -148,15 +165,23 @@ impl BgChanger {
         return self
             .cfg
             .background_field_location
-            .get(settings_file)?
-            .as_str()
-            .ok_or(crate::error::BackgroundChangerError::Convertion)
-            .map(|bg| bg.to_string());
+            .get(settings_file)
+            .and_then(|bg_json| {
+                bg_json
+                    .as_str()
+                    .ok_or(crate::error::BackgroundChangerError::Convertion)
+                    .map(|str_bg| str_bg.to_string())
+            })
+            .map_err(|e| {
+                self.history.add_error_occured(e.to_string());
+                e
+            });
     }
 
     pub fn set(&mut self, mut tries: i32) -> Result<i32, crate::error::BackgroundChangerError> {
         loop {
             if tries == 0 {
+                error!("Failled to set a background");
                 return Err(crate::error::BackgroundChangerError::Config);
             }
 
@@ -166,7 +191,8 @@ impl BgChanger {
                     return Ok(tries);
                 }
                 Err(e) => {
-                    self.history.add_error_occured(e);
+                    self.history.add_error_occured(e.to_string());
+                    error!("{}, Restoring the backup..", e);
 
                     // restore config from backu
                     let backup_file_path = {
@@ -183,15 +209,24 @@ impl BgChanger {
             }
         }
     }
-    fn __set(&self) -> Result<(String, String), crate::error::BackgroundChangerError> {
+    fn __set(&mut self) -> Result<(String, String), crate::error::BackgroundChangerError> {
         use std::io::Read as _;
 
         let old_bg = self.get()?;
 
         // Ugly af, don't like this part
+        let mut max_tries = 5;
         let new_bg = loop {
             if let Some(bg) = self.select_random_bg() {
                 break bg;
+            } else {
+                max_tries -= 1;
+            }
+
+            if max_tries == 0 {
+                return Err(crate::error::BackgroundChangerError::Fs(
+                    "Can't find access selected background file",
+                ));
             }
         }
         .as_path()
@@ -224,5 +259,23 @@ impl BgChanger {
                 Err(crate::error::BackgroundChangerError::Verification)
             }
         })
+    }
+}
+
+impl SystemTimeDelay {
+    pub fn new(timeout: u128) -> Self {
+        Self {
+            instant: std::time::Instant::now(),
+            timeout,
+        }
+    }
+
+    pub fn ended(&self) -> bool {
+        self.instant.elapsed().as_millis() >= self.timeout
+    }
+}
+impl From<u128> for SystemTimeDelay {
+    fn from(timeout: u128) -> SystemTimeDelay {
+        SystemTimeDelay::new(timeout)
     }
 }

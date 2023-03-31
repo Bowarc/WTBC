@@ -1,4 +1,4 @@
-pub const LOG_FILE_LOCATION: &str = "logs.log";
+pub const LOG_FILE_LOCATION: &str = "logs.wtbc.log";
 pub const BACKUP_FILE_NAME: &str = "settings.json.wtbc.backup";
 
 pub enum SleepTime {
@@ -7,7 +7,6 @@ pub enum SleepTime {
     // possible values ? Like a Vec<std::time::Duration> ?
 }
 
-// can be replaced by "profiles/defaults/backgroundImage" using serde_json::Value.pointer()
 pub struct BgFieldLoc(pub &'static str);
 
 pub struct BgChangerConfig {

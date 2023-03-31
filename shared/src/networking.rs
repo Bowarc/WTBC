@@ -37,6 +37,7 @@ pub enum ClientMessage {
     Text(String),
     GetLogFile, // asks for the position of the log file
     GetHistory, // asks for the bgchanger history, that said, might be better to have an app history, i mean, ~~it would be cool for the client to see what client connected~~meh
+    GetRecap,   // asks for a recap of the activities done by the daemon
     SetBg,
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,6 +45,7 @@ pub enum DaemonMessage {
     Text(String),
     History(crate::server::history::History),
     LogFile(String), // Path
+    Recap(crate::server::recap::Recap),
 }
 
 impl<R: DeserializeOwned + std::fmt::Debug, W: Serialize + std::fmt::Debug> Socket<R, W> {

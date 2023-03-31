@@ -6,7 +6,6 @@ pub fn init() {
                 chrono::Local::now().format("%H:%M:%S"),
                 record.level(),
                 record.file().unwrap_or("Unknown file"),
-                // .replace("daemon\\src/", ""),
                 record
                     .line()
                     .map(|l| l.to_string())

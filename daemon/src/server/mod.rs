@@ -5,12 +5,6 @@ pub struct Server {
     tcp_listener: std::net::TcpListener,
 }
 
-#[derive(Debug)]
-pub enum Command {}
-
-#[derive(Debug)]
-pub enum ServerMsg {}
-
 impl Server {
     pub fn new() -> Self {
         let listener = std::net::TcpListener::bind(shared::networking::DEFAULT_ADDRESS).unwrap();
@@ -31,11 +25,7 @@ impl Server {
             match self.tcp_listener.accept() {
                 Ok((stream, addr)) => {
                     debug!("New client {addr:?}");
-                    stream.set_nodelay(true).unwrap();
-                    // We can't afford to block the main thread to wait for clients, but as each client
-                    // has it's own thread, there is no problem blocking the client's thread.
-                    // Unless we want the client thread to receive infos about the outside of it's thread (which it will later..)
-                    // stream.set_nonblocking(false).unwrap();
+                    stream.set_nodelay(true).unwrap(); // ?
 
                     self.client = Some(client::Client::new(stream));
                 }
@@ -44,6 +34,10 @@ impl Server {
                     // via platform-specific APIs such as epoll or IOCP
                     // println!("Would block");
                     // continue;
+
+                    // About this part, as the implementation is non-blocking,
+                    // i'll assume that the program will do some other job before getting back to this part,
+                    // therefore the socket will have time to do it's things
                 }
 
                 Err(e) => {
@@ -53,7 +47,3 @@ impl Server {
         }
     }
 }
-
-// wait until network socket is ready, typically implemented
-// via platform-specific APIs such as epoll or IOCP
-// println!("Would block");

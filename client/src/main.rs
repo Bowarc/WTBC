@@ -15,6 +15,7 @@ fn main() {
         let message = match input.replace(['\n', '\r'], "").as_str() {
             "getlog" => shared::networking::ClientMessage::GetLogFile,
             "gethistory" => shared::networking::ClientMessage::GetHistory,
+            "getrecap" => shared::networking::ClientMessage::GetRecap,
             "setbg" => shared::networking::ClientMessage::SetBg,
             "exit" => std::process::exit(0),
             text => shared::networking::ClientMessage::Text(text.to_string()),

@@ -3,7 +3,6 @@ pub struct Client {
         shared::networking::ClientMessage, // Reading
         shared::networking::DaemonMessage, // Writing
     >,
-    pending_commands: Vec<crate::server::Command>,
 }
 
 ////////////////////////////////////////
@@ -17,7 +16,6 @@ impl Client {
                 shared::networking::ClientMessage, // Reading
                 shared::networking::DaemonMessage, // Writing
             >::new(stream),
-            pending_commands: Vec::new(),
         }
     }
 
@@ -28,7 +26,6 @@ impl Client {
         match self.socket.recv() {
             Ok(message) => {
                 debug!("Got a message from client: {message:?}",);
-                // match message and send commands to the main thread
 
                 let response = match message {
                     shared::networking::ClientMessage::Text(txt) => {
@@ -47,6 +44,53 @@ impl Client {
                     shared::networking::ClientMessage::GetHistory => {
                         shared::networking::DaemonMessage::History(bgchanger.history.clone())
                     }
+                    shared::networking::ClientMessage::GetRecap => {
+                        shared::networking::DaemonMessage::Recap(shared::server::recap::Recap {
+                            errors: {
+                                bgchanger
+                                    .history
+                                    .bits
+                                    .iter()
+                                    .filter_map(|(time, bit)| {
+                                        if let shared::server::history::HistoryBit::ErrorOccured(
+                                            e,
+                                        ) = bit
+                                        {
+                                            Some((*time, e.clone()))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect::<Vec<(std::time::SystemTime, String)>>()
+                            },
+                            number_of_bgset: {
+                                let mut count: usize = 0;
+                                bgchanger.history.bits.iter().for_each(|(_time, bit)| {
+                                    if let shared::server::history::HistoryBit::BackgroundSet(
+                                        _old,
+                                        _new,
+                                    ) = bit
+                                    {
+                                        count += 1
+                                    }
+                                });
+                                count
+                            },
+                            time_until_next_bgset: {
+                                std::time::Duration::from_millis(
+                                    (bgchanger.delay.timeout
+                                        - bgchanger.delay.instant.elapsed().as_millis())
+                                        as u64,
+                                )
+                            },
+                            actual_bg: {
+                                bgchanger.get().unwrap_or_else(|e| {
+                                    format!("Error while fetching background: {e}")
+                                })
+                            },
+                        })
+                    }
+
                     shared::networking::ClientMessage::SetBg => {
                         let number_of_tries = 5;
                         let return_text = if let Ok(tries_left) = bgchanger.set(number_of_tries) {
@@ -76,9 +120,7 @@ impl Client {
                 } else {
                     false
                 } {
-
-                    // println!("hehe");
-                    // continue;
+                    // Error kind is WouldBlock, skipping
                 } else {
                     error!("Error while listening for message: {e}");
                     Err(e)?;
@@ -88,18 +130,4 @@ impl Client {
 
         Ok(())
     }
-}
-
-pub fn handle_client(stream: std::net::TcpStream) {
-    let mut socket = shared::networking::Socket::<
-        shared::networking::ClientMessage, // Reading
-        shared::networking::DaemonMessage, // Writing
-    >::new(stream);
-
-    loop {
-
-        // debug!("{:?}", message);
-    }
-
-    // match on messages, and send commands to the receiver
 }
